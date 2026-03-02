@@ -90,11 +90,13 @@ class ScopeService
      */
     public static function checkLocationAccess(int $userId, int $locationId, int $orgId): bool
     {
-        // Utilise l.organization_id (cohérent avec requireLocationAccess)
+        // Filtre via c.organization_id (campagne) — plus fiable que l.organization_id
+        // qui peut être 0 si MySQL stockait une valeur vide pour NOT NULL
         $location = Database::fetchOne(
             'SELECT l.id, l.campaign_id, l.site_id
              FROM locations l
-             WHERE l.id = ? AND l.organization_id = ?',
+             JOIN campaigns c ON c.id = l.campaign_id
+             WHERE l.id = ? AND c.organization_id = ?',
             [$locationId, $orgId]
         );
 
@@ -256,12 +258,14 @@ class ScopeService
         $orgId  = Auth::orgId();
 
         // 1. Vérifier que le local existe et appartient à l'organisation
+        //    On filtre via c.organization_id (campagne) car l.organization_id peut être 0
+        //    si la ligne a été créée quand MySQL était en mode non-strict avec NOT NULL.
         $location = Database::fetchOne(
             'SELECT l.*, s.name as site_name, c.name as campaign_name, c.config as campaign_config
              FROM locations l
              LEFT JOIN sites s ON s.id = l.site_id
              JOIN campaigns c ON c.id = l.campaign_id
-             WHERE l.id = ? AND l.organization_id = ?',
+             WHERE l.id = ? AND c.organization_id = ?',
             [$locationId, $orgId]
         );
 
