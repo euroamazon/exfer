@@ -150,12 +150,14 @@ class ImportController extends Controller
         $job = Database::fetchOne('SELECT * FROM import_jobs WHERE id = ? AND campaign_id = ?', [(int)$params['jid'], $campaign['id']]);
         if (!$job) Response::notFound();
 
-        // Récupérer le mapping
-        $mapping = [];
-        foreach ($request->allPost() as $key => $val) {
-            if (str_starts_with($key, 'map_') && $val) {
-                $fileCol = substr($key, 4);
-                $mapping[$fileCol] = $val;
+        // Récupérer le mapping depuis le formulaire (format: mapping[header]=field)
+        $rawMapping = $request->post('mapping');
+        $mapping    = [];
+        if (is_array($rawMapping)) {
+            foreach ($rawMapping as $fileCol => $dbField) {
+                if ($dbField) {
+                    $mapping[$fileCol] = $dbField;
+                }
             }
         }
 
@@ -163,15 +165,25 @@ class ImportController extends Controller
         Database::update('import_jobs', ['column_mapping' => json_encode($mapping)], ['id' => $job['id']]);
 
         // Validation / preview
-        $parsed    = $this->importService->parseFile($job['filepath']);
-        $isDryRun  = (bool)$job['is_dry_run'];
-        $result    = $this->importService->validate($parsed['rows'], $mapping, $campaign['id'], $orgId, $job['mode'], $isDryRun);
+        $parsed   = $this->importService->parseFile($job['filepath']);
+        $isDryRun = (bool)$job['is_dry_run'];
+        $result   = $this->importService->validate($parsed['rows'], $mapping, $campaign['id'], $orgId, $job['mode'], $isDryRun);
+
+        $rawStats = $result['stats'] ?? [];
+        $stats = [
+            'total'    => $rawStats['total']  ?? count($parsed['rows']),
+            'valid'    => ($rawStats['insert'] ?? 0) + ($rawStats['update'] ?? 0),
+            'errors'   => count($result['errors'] ?? []),
+            'warnings' => 0,
+        ];
 
         $this->render('imports/preview', [
-            'campaign'  => $campaign,
-            'job'       => $job,
-            'result'    => $result,
-            'pageTitle' => 'Aperçu import',
+            'campaign'    => $campaign,
+            'job'         => $job,
+            'stats'       => $stats,
+            'errors'      => $result['errors'] ?? [],
+            'previewRows' => array_map(fn($r) => $r['data'] ?? [], array_slice($result['preview'] ?? [], 0, 10)),
+            'pageTitle'   => 'Aperçu import',
         ]);
     }
 

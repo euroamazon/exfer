@@ -85,11 +85,11 @@ class LocationController extends Controller
 
         $errors = $request->validate([
             'code_local' => 'required|max:100',
-            'site_id'    => 'required|integer',
         ]);
 
         if ($errors) {
             Session::flash('errors', $errors);
+            Session::flashOld($request->allPost());
             Response::redirect('/campaigns/' . $campaign['id'] . '/locations/create');
         }
 
@@ -101,13 +101,16 @@ class LocationController extends Controller
 
         if ($existing) {
             Session::error('Ce code local existe déjà dans cette campagne.');
+            Session::flashOld($request->allPost());
             Response::redirect('/campaigns/' . $campaign['id'] . '/locations/create');
         }
+
+        $siteId = $request->post('site_id') ? (int)$request->post('site_id') : null;
 
         $id = Database::insert('locations', [
             'organization_id'   => $orgId,
             'campaign_id'       => $campaign['id'],
-            'site_id'           => (int)$request->post('site_id'),
+            'site_id'           => $siteId,
             'code_local'        => $request->post('code_local'),
             'designation_local' => $request->post('designation_local') ?: null,
             'status'            => 'IN_PROGRESS',

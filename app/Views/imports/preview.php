@@ -69,15 +69,14 @@
             <div class="table-responsive">
                 <table class="table table-sm mb-0">
                     <thead class="table-light">
-                        <tr><th>Ligne</th><th>Colonne</th><th>Erreur</th><th>Valeur</th></tr>
+                        <tr><th>Ligne</th><th>Code</th><th>Erreur(s)</th></tr>
                     </thead>
                     <tbody>
                         <?php foreach (array_slice($errors, 0, 50) as $err): ?>
                         <tr class="table-danger">
                             <td><?= $err['row'] ?? '—' ?></td>
-                            <td><code><?= \App\Core\View::e($err['field'] ?? '—') ?></code></td>
-                            <td><?= \App\Core\View::e($err['message'] ?? '—') ?></td>
-                            <td class="fw-mono small"><?= \App\Core\View::e($err['value'] ?? '') ?></td>
+                            <td class="fw-mono small"><?= \App\Core\View::e($err['code'] ?? '—') ?></td>
+                            <td><?= \App\Core\View::e(implode(', ', (array)($err['errors'] ?? [$err['message'] ?? '—']))) ?></td>
                         </tr>
                         <?php endforeach; ?>
                         <?php if (count($errors) > 50): ?>
@@ -123,7 +122,7 @@
 
     <!-- Actions -->
     <div class="d-flex gap-2">
-        <?php if ($stats['errors'] === 0 || $job['is_dry_run']): ?>
+        <?php if (empty($errors) || $job['is_dry_run']): ?>
         <form method="POST" action="/campaigns/<?= $campaign['id'] ?>/import/<?= $job['id'] ?>/execute">
             <?= \App\Core\CSRF::field() ?>
             <button type="submit" class="btn btn-success"

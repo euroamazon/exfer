@@ -38,16 +38,16 @@
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Code début <span class="text-danger">*</span></label>
                             <input type="text" name="start_code" class="form-control fw-mono"
-                                   placeholder="<?= $campaign['config']['code_length'] ?? 6 ?> chiffres" required maxlength="20">
+                                   placeholder="<?= $config['code_length'] ?? 6 ?> chiffres" required maxlength="20">
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Code fin <span class="text-danger">*</span></label>
                             <input type="text" name="end_code" class="form-control fw-mono"
-                                   placeholder="<?= $campaign['config']['code_length'] ?? 6 ?> chiffres" required maxlength="20">
+                                   placeholder="<?= $config['code_length'] ?? 6 ?> chiffres" required maxlength="20">
                         </div>
                         <?php
-                        $codeLen = $campaign['config']['code_length'] ?? 6;
-                        $codeType = $campaign['config']['code_type'] ?? 'NUMERIC';
+                        $codeLen  = $config['code_length'] ?? 6;
+                        $codeType = $config['code_type'] ?? 'NUMERIC';
                         ?>
                         <div class="alert alert-info py-2 small">
                             <i class="bi bi-info-circle me-1"></i>

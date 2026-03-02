@@ -19,6 +19,10 @@ class LabelRollController extends Controller
     {
         $this->requireAuth();
         $campaign = ScopeService::requireCampaignAccess((int)$params['cid']);
+        $orgId    = Auth::orgId();
+
+        // Décoder la config pour l'affichage dans le formulaire
+        $config = json_decode($campaign['config'] ?? '{}', true) ?: [];
 
         $rolls = Database::fetchAll(
             'SELECT lr.*, u.name as agent_name
@@ -29,9 +33,22 @@ class LabelRollController extends Controller
             [$campaign['id']]
         );
 
+        // Liste des agents de la campagne pour le formulaire de création
+        $agents = Database::fetchAll(
+            'SELECT u.id, u.name, u.email
+             FROM users u
+             JOIN campaign_members cm ON cm.user_id = u.id AND cm.campaign_id = ? AND cm.is_active = 1
+             WHERE u.organization_id = ? AND u.is_active = 1
+             ORDER BY u.name',
+            [$campaign['id'], $orgId]
+        );
+
         $this->render('label_rolls/index', [
             'campaign'  => $campaign,
+            'config'    => $config,
             'rolls'     => $rolls,
+            'agents'    => $agents,
+            'errors'    => [],
             'pageTitle' => 'Rouleaux d\'étiquettes',
         ]);
     }

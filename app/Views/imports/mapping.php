@@ -1,3 +1,19 @@
+<?php
+// Auto-suggestion : normalise un header pour trouver une correspondance
+$normalize = fn(string $s): string => strtolower(trim(preg_replace('/[^a-z0-9]/i', '_', $s)));
+$suggested = [];
+foreach ($fileHeaders as $header) {
+    $norm = $normalize($header);
+    // Correspondance exacte ou partielle avec les champs DB
+    foreach (array_keys($dbFields) as $key) {
+        if ($normalize($key) === $norm || str_contains($norm, $normalize($key))) {
+            $suggested[$header] = $key;
+            break;
+        }
+    }
+}
+$previewRow = $previewRows[0] ?? [];
+?>
 <div class="container-fluid py-4">
     <!-- En-tête -->
     <div class="d-flex align-items-center gap-2 mb-4">
@@ -33,14 +49,15 @@
             </div>
             <div class="card-body">
                 <p class="text-muted small mb-3">
-                    Associez chaque colonne du fichier à un champ de la campagne. Laissez « — Ignorer —» pour les colonnes à ne pas importer.
+                    Associez chaque colonne du fichier à un champ de la campagne.
+                    Laissez <em>— Ignorer —</em> pour les colonnes à ne pas importer.
                 </p>
                 <div class="table-responsive">
                     <table class="table table-bordered mb-0">
                         <thead class="table-light">
                             <tr>
                                 <th>Colonne dans le fichier</th>
-                                <th>Aperçu (première ligne)</th>
+                                <th>Aperçu (1ère ligne)</th>
                                 <th>Correspondance dans ExFer</th>
                             </tr>
                         </thead>
@@ -52,31 +69,12 @@
                                 <td>
                                     <select name="mapping[<?= \App\Core\View::e($header) ?>]" class="form-select form-select-sm">
                                         <option value="">— Ignorer —</option>
-                                        <optgroup label="Champs système">
-                                            <?php
-                                            $systemFields = [
-                                                'code_immo' => 'Code immobilisation',
-                                                'designation' => 'Désignation',
-                                                'code_local' => 'Code local',
-                                                'serial_number' => 'N° de série',
-                                                'notes' => 'Notes',
-                                            ];
-                                            foreach ($systemFields as $k => $label):
-                                                $selected = $suggestedMapping[$header] === $k ? 'selected' : '';
-                                            ?>
-                                            <option value="<?= $k ?>" <?= $selected ?>><?= $label ?></option>
-                                            <?php endforeach; ?>
-                                        </optgroup>
-                                        <?php if (!empty($columns)): ?>
-                                        <optgroup label="Colonnes dynamiques">
-                                            <?php foreach ($columns as $col): ?>
-                                            <option value="col_<?= $col['column_key'] ?>"
-                                                    <?= ($suggestedMapping[$header] ?? '') === 'col_' . $col['column_key'] ? 'selected' : '' ?>>
-                                                <?= \App\Core\View::e($col['label']) ?>
-                                            </option>
-                                            <?php endforeach; ?>
-                                        </optgroup>
-                                        <?php endif; ?>
+                                        <?php foreach ($dbFields as $key => $label): ?>
+                                        <option value="<?= \App\Core\View::e($key) ?>"
+                                                <?= ($suggested[$header] ?? '') === $key ? 'selected' : '' ?>>
+                                            <?= \App\Core\View::e($label) ?>
+                                        </option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </td>
                             </tr>

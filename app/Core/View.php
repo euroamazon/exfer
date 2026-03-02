@@ -58,6 +58,14 @@ class View
     }
 
     /**
+     * Récupère une ancienne valeur de formulaire (après redirection sur erreur)
+     */
+    public static function old(string $key, mixed $default = ''): mixed
+    {
+        return Session::old($key, $default);
+    }
+
+    /**
      * Badge HTML selon statut
      */
     public static function statusBadge(string $status): string

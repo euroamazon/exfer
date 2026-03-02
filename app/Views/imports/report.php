@@ -49,8 +49,7 @@
         <strong><?= $statusInfo[2] ?></strong>
     </div>
 
-    <!-- Stats -->
-    <?php $stats = $job['stats_json'] ?? []; ?>
+    <!-- Stats (passed from controller as decoded array) -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-lg-3">
             <div class="card border-0 bg-primary bg-opacity-10">
@@ -86,8 +85,8 @@
         </div>
     </div>
 
-    <!-- Log erreurs -->
-    <?php if (!empty($job['error_log'])): ?>
+    <!-- Log erreurs (variable $errors passée par le contrôleur) -->
+    <?php if (!empty($errors)): ?>
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white pt-3">
             <h6 class="card-title mb-0 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Journal des erreurs</h6>
@@ -96,14 +95,14 @@
             <div class="table-responsive">
                 <table class="table table-sm mb-0">
                     <thead class="table-light">
-                        <tr><th>Ligne</th><th>Champ</th><th>Erreur</th></tr>
+                        <tr><th>Ligne</th><th>Code</th><th>Erreur</th></tr>
                     </thead>
                     <tbody>
-                        <?php foreach (array_slice($job['error_log'], 0, 100) as $err): ?>
+                        <?php foreach (array_slice($errors, 0, 100) as $err): ?>
                         <tr class="table-danger">
                             <td><?= $err['row'] ?? '—' ?></td>
-                            <td><code><?= \App\Core\View::e($err['field'] ?? '—') ?></code></td>
-                            <td><?= \App\Core\View::e($err['message'] ?? '—') ?></td>
+                            <td><code><?= \App\Core\View::e($err['code'] ?? '—') ?></code></td>
+                            <td><?= \App\Core\View::e(implode(', ', (array)($err['errors'] ?? $err['message'] ?? '—'))) ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>

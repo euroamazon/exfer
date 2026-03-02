@@ -106,8 +106,10 @@ class CampaignController extends Controller
         $sites     = Database::fetchAll('SELECT * FROM sites WHERE campaign_id = ? AND is_active = 1 ORDER BY name', [$campaign['id']]);
         $locations = Database::fetchAll(
             'SELECT l.*, s.name as site_name,
-                    (SELECT COUNT(*) FROM inventory_items WHERE location_id = l.id) as items_count
-             FROM locations l JOIN sites s ON s.id = l.site_id
+                    (SELECT COUNT(*) FROM inventory_items WHERE location_id = l.id) as items_count,
+                    (SELECT COUNT(*) FROM anomalies WHERE location_id = l.id AND status IN ("OPEN","INVESTIGATION")) as anomaly_count
+             FROM locations l
+             LEFT JOIN sites s ON s.id = l.site_id
              WHERE l.campaign_id = ? ORDER BY s.name, l.code_local',
             [$campaign['id']]
         );
@@ -290,13 +292,32 @@ class CampaignController extends Controller
         $orgId    = Auth::orgId();
 
         $members = Database::fetchAll(
-            'SELECT cm.*, u.name, u.email, u.role
+            'SELECT cm.*, u.name as user_name, u.email as user_email, u.role as user_role
              FROM campaign_members cm
              JOIN users u ON u.id = cm.user_id
-             WHERE cm.campaign_id = ?
+             WHERE cm.campaign_id = ? AND cm.is_active = 1
              ORDER BY cm.role_in_campaign, u.name',
             [$campaign['id']]
         );
+
+        // Enrichir chaque membre avec les sites de son scope
+        $sitesMap = [];
+        foreach (Database::fetchAll('SELECT * FROM sites WHERE campaign_id = ?', [$campaign['id']]) as $s) {
+            $sitesMap[$s['id']] = $s['name'];
+        }
+        foreach ($members as &$member) {
+            $scopeRows = Database::fetchAll(
+                'SELECT * FROM campaign_member_scope WHERE member_id = ?',
+                [$member['id']]
+            );
+            $member['scope_sites'] = [];
+            foreach ($scopeRows as $sr) {
+                if ($sr['site_id'] && isset($sitesMap[$sr['site_id']])) {
+                    $member['scope_sites'][] = $sitesMap[$sr['site_id']];
+                }
+            }
+        }
+        unset($member);
 
         $availableUsers = Database::fetchAll(
             'SELECT u.* FROM users u
@@ -306,13 +327,13 @@ class CampaignController extends Controller
             [$orgId, $campaign['id']]
         );
 
-        $sites = Database::fetchAll('SELECT * FROM sites WHERE campaign_id = ?', [$campaign['id']]);
+        $sites = array_values($sitesMap);
 
         $this->render('campaigns/members', [
             'campaign'       => $campaign,
             'members'        => $members,
             'availableUsers' => $availableUsers,
-            'sites'          => $sites,
+            'sites'          => Database::fetchAll('SELECT * FROM sites WHERE campaign_id = ? ORDER BY name', [$campaign['id']]),
             'pageTitle'      => 'Membres de la campagne',
         ]);
     }
@@ -350,8 +371,8 @@ class CampaignController extends Controller
                 'updated_at'       => date('Y-m-d H:i:s'),
             ]);
 
-            // Gérer le scope
-            $siteIds     = $request->post('scope_sites') ? (array)$request->post('scope_sites') : [];
+            // Gérer le scope (le formulaire envoie site_ids[] et scope_locations[])
+            $siteIds     = $request->post('site_ids') ? (array)$request->post('site_ids') : [];
             $locationIds = $request->post('scope_locations') ? (array)$request->post('scope_locations') : [];
 
             foreach ($siteIds as $siteId) {
