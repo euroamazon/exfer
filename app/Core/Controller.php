@@ -11,7 +11,7 @@ abstract class Controller
     /**
      * Rend une vue avec le layout de base
      */
-    protected function render(string $view, array $data = [], string $layout = 'layout/base'): void
+    protected function render(string $view, array $data = [], ?string $layout = 'layout/base'): void
     {
         // Injecter les variables communes
         $data['_user']    = Auth::user();
