@@ -255,10 +255,7 @@ class ScopeService
         $userId = Auth::id();
         $orgId  = Auth::orgId();
 
-        if (!self::checkLocationAccess($userId, $locationId, $orgId)) {
-            Response::forbidden("Vous n'avez pas accès à ce local.");
-        }
-
+        // 1. Vérifier que le local existe et appartient à l'organisation
         $location = Database::fetchOne(
             'SELECT l.*, s.name as site_name, c.name as campaign_name, c.config as campaign_config
              FROM locations l
@@ -272,6 +269,52 @@ class ScopeService
             Response::notFound('Local introuvable.');
         }
 
-        return $location;
+        // 2. ADMIN : accès total — vérification session d'abord, puis base de données en fallback
+        $role = Auth::role();
+        if ($role !== 'ADMIN') {
+            $dbUser = Database::fetchOne('SELECT role FROM users WHERE id = ?', [$userId]);
+            $role   = $dbUser['role'] ?? null;
+        }
+        if ($role === 'ADMIN') {
+            return $location;
+        }
+
+        // 3. Non-ADMIN : vérifier le membership dans la campagne
+        $member = Database::fetchOne(
+            'SELECT id FROM campaign_members WHERE campaign_id = ? AND user_id = ? AND is_active = 1',
+            [$location['campaign_id'], $userId]
+        );
+
+        if (!$member) {
+            Response::forbidden("Vous n'avez pas accès à ce local.");
+        }
+
+        // 4. Vérifier le scope (pas de lignes = accès complet à la campagne)
+        $scopeRows = Database::fetchAll(
+            'SELECT * FROM campaign_member_scope WHERE member_id = ?',
+            [$member['id']]
+        );
+
+        if (empty($scopeRows)) {
+            return $location;
+        }
+
+        foreach ($scopeRows as $scope) {
+            // Accès par local spécifique
+            if ($scope['location_id'] !== null && (int)$scope['location_id'] === $locationId) {
+                return $location;
+            }
+            // Accès par site
+            if ($scope['location_id'] === null && $scope['site_id'] !== null
+                && (int)$scope['site_id'] === (int)$location['site_id']) {
+                return $location;
+            }
+            // Accès global explicite
+            if ($scope['site_id'] === null && $scope['location_id'] === null) {
+                return $location;
+            }
+        }
+
+        Response::forbidden("Vous n'avez pas accès à ce local.");
     }
 }
