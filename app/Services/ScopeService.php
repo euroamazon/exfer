@@ -90,17 +90,21 @@ class ScopeService
      */
     public static function checkLocationAccess(int $userId, int $locationId, int $orgId): bool
     {
-        // Filtre via c.organization_id (campagne) — plus fiable que l.organization_id
-        // qui peut être 0 si MySQL stockait une valeur vide pour NOT NULL
+        // Trouver le local par ID seul, puis vérifier l'organisation en PHP
         $location = Database::fetchOne(
-            'SELECT l.id, l.campaign_id, l.site_id
+            'SELECT l.id, l.campaign_id, l.site_id, c.organization_id as c_org_id
              FROM locations l
              JOIN campaigns c ON c.id = l.campaign_id
-             WHERE l.id = ? AND c.organization_id = ?',
-            [$locationId, $orgId]
+             WHERE l.id = ?',
+            [$locationId]
         );
 
         if (!$location) {
+            return false;
+        }
+
+        // Vérifier l'appartenance à l'organisation
+        if ((int)$location['c_org_id'] !== (int)$orgId) {
             return false;
         }
 
@@ -257,23 +261,29 @@ class ScopeService
         $userId = Auth::id();
         $orgId  = Auth::orgId();
 
-        // 1. Vérifier que le local existe et appartient à l'organisation
-        //    On filtre via c.organization_id (campagne) car l.organization_id peut être 0
-        //    si la ligne a été créée quand MySQL était en mode non-strict avec NOT NULL.
+        // 1. Trouver le local par son ID (sans filtre organisation dans le SQL
+        //    pour éviter les problèmes de valeur 0 dans organization_id)
         $location = Database::fetchOne(
-            'SELECT l.*, s.name as site_name, c.name as campaign_name, c.config as campaign_config
+            'SELECT l.*, s.name as site_name,
+                    c.name as campaign_name, c.config as campaign_config,
+                    c.organization_id as c_org_id
              FROM locations l
              LEFT JOIN sites s ON s.id = l.site_id
              JOIN campaigns c ON c.id = l.campaign_id
-             WHERE l.id = ? AND c.organization_id = ?',
-            [$locationId, $orgId]
+             WHERE l.id = ?',
+            [$locationId]
         );
 
         if (!$location) {
             Response::notFound('Local introuvable.');
         }
 
-        // 2. ADMIN : accès total — vérification session d'abord, puis base de données en fallback
+        // 2. Vérifier que la campagne appartient à l'organisation de l'utilisateur
+        if ((int)$location['c_org_id'] !== (int)$orgId) {
+            Response::forbidden("Vous n'avez pas accès à ce local.");
+        }
+
+        // 3. ADMIN : accès total — vérification session d'abord, puis base de données en fallback
         $role = Auth::role();
         if ($role !== 'ADMIN') {
             $dbUser = Database::fetchOne('SELECT role FROM users WHERE id = ?', [$userId]);
