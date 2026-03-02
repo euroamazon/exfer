@@ -300,20 +300,28 @@ class CampaignController extends Controller
             [$campaign['id']]
         );
 
-        // Enrichir chaque membre avec les sites de son scope
+        // Enrichir chaque membre avec les sites et locaux de son scope
         $sitesMap = [];
         foreach (Database::fetchAll('SELECT * FROM sites WHERE campaign_id = ?', [$campaign['id']]) as $s) {
             $sitesMap[$s['id']] = $s['name'];
+        }
+        $locationsMap = [];
+        foreach (Database::fetchAll('SELECT id, code_local, designation_local FROM locations WHERE campaign_id = ? ORDER BY code_local', [$campaign['id']]) as $l) {
+            $locationsMap[$l['id']] = $l['code_local'] . ($l['designation_local'] ? ' — ' . $l['designation_local'] : '');
         }
         foreach ($members as &$member) {
             $scopeRows = Database::fetchAll(
                 'SELECT * FROM campaign_member_scope WHERE member_id = ?',
                 [$member['id']]
             );
-            $member['scope_sites'] = [];
+            $member['scope_sites']     = [];
+            $member['scope_locations'] = [];
             foreach ($scopeRows as $sr) {
                 if ($sr['site_id'] && isset($sitesMap[$sr['site_id']])) {
                     $member['scope_sites'][] = $sitesMap[$sr['site_id']];
+                }
+                if ($sr['location_id'] && isset($locationsMap[$sr['location_id']])) {
+                    $member['scope_locations'][] = $locationsMap[$sr['location_id']];
                 }
             }
         }
@@ -327,13 +335,12 @@ class CampaignController extends Controller
             [$orgId, $campaign['id']]
         );
 
-        $sites = array_values($sitesMap);
-
         $this->render('campaigns/members', [
             'campaign'       => $campaign,
             'members'        => $members,
             'availableUsers' => $availableUsers,
             'sites'          => Database::fetchAll('SELECT * FROM sites WHERE campaign_id = ? ORDER BY name', [$campaign['id']]),
+            'locations'      => Database::fetchAll('SELECT id, code_local, designation_local FROM locations WHERE campaign_id = ? ORDER BY code_local', [$campaign['id']]),
             'pageTitle'      => 'Membres de la campagne',
         ]);
     }

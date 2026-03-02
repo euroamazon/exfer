@@ -44,7 +44,19 @@
                                 <option value="<?= $site['id'] ?>"><?= \App\Core\View::e($site['name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="form-text">Laisser vide = accès à tous les sites.</div>
+                            <div class="form-text">Laisser les deux champs vides = accès complet.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Périmètre — Locaux (optionnel)</label>
+                            <select name="scope_locations[]" class="form-select" multiple size="5">
+                                <?php foreach ($locations as $loc): ?>
+                                <option value="<?= $loc['id'] ?>">
+                                    <?= \App\Core\View::e($loc['code_local']) ?>
+                                    <?php if ($loc['designation_local']): ?>— <?= \App\Core\View::e($loc['designation_local']) ?><?php endif; ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text">Affectation par local spécifique (prioritaire sur le site).</div>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">
                             <i class="bi bi-person-plus me-1"></i>Ajouter
@@ -87,10 +99,21 @@
                                     <span class="badge bg-<?= $roleColors[$role] ?? 'secondary' ?>"><?= $roleLabels[$role] ?? $role ?></span>
                                 </td>
                                 <td class="small text-muted">
-                                    <?php if (!empty($member['scope_sites'])): ?>
-                                    <span title="<?= \App\Core\View::e(implode(', ', $member['scope_sites'])) ?>">
-                                        <?= count($member['scope_sites']) ?> site(s)
-                                    </span>
+                                    <?php
+                                    $hasSites     = !empty($member['scope_sites']);
+                                    $hasLocations = !empty($member['scope_locations']);
+                                    if ($hasSites || $hasLocations):
+                                    ?>
+                                        <?php if ($hasSites): ?>
+                                        <div title="<?= \App\Core\View::e(implode(', ', $member['scope_sites'])) ?>">
+                                            <i class="bi bi-building me-1"></i><?= count($member['scope_sites']) ?> site(s)
+                                        </div>
+                                        <?php endif; ?>
+                                        <?php if ($hasLocations): ?>
+                                        <div title="<?= \App\Core\View::e(implode(', ', $member['scope_locations'])) ?>">
+                                            <i class="bi bi-door-open me-1"></i><?= count($member['scope_locations']) ?> local/locaux
+                                        </div>
+                                        <?php endif; ?>
                                     <?php else: ?>
                                     <span class="text-success"><i class="bi bi-globe me-1"></i>Complet</span>
                                     <?php endif; ?>
