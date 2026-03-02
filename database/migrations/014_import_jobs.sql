@@ -1,0 +1,25 @@
+-- Migration 014: Jobs d'import Excel/CSV
+CREATE TABLE IF NOT EXISTS `import_jobs` (
+    `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `organization_id` INT UNSIGNED NOT NULL,
+    `campaign_id`     INT UNSIGNED NOT NULL,
+    `filename`        VARCHAR(500) NOT NULL,
+    `filepath`        VARCHAR(500)          DEFAULT NULL COMMENT 'Chemin vers le fichier uploadé',
+    `mode`            ENUM('INSERT','UPDATE','UPSERT') NOT NULL DEFAULT 'INSERT',
+    `status`          ENUM('PENDING','PROCESSING','DONE','FAILED') NOT NULL DEFAULT 'PENDING',
+    `is_dry_run`      TINYINT(1)   NOT NULL DEFAULT 0,
+    `column_mapping`  JSON         DEFAULT NULL COMMENT 'Mapping colonne fichier → champ BDD',
+    `stats_json`      JSON         DEFAULT NULL COMMENT '{total, inserted, updated, skipped, errors, anomalies}',
+    `error_log`       JSON         DEFAULT NULL COMMENT '[{row, message}]',
+    `created_by`      INT UNSIGNED          DEFAULT NULL,
+    `started_at`      DATETIME              DEFAULT NULL,
+    `finished_at`     DATETIME              DEFAULT NULL,
+    `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_import_org`      (`organization_id`),
+    KEY `idx_import_campaign` (`campaign_id`),
+    KEY `idx_import_status`   (`status`),
+    CONSTRAINT `fk_import_org`      FOREIGN KEY (`organization_id`) REFERENCES `organizations` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_import_campaign` FOREIGN KEY (`campaign_id`)     REFERENCES `campaigns` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_import_creator`  FOREIGN KEY (`created_by`)      REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,0 +1,16 @@
+# Deny execution of scripts in uploads directory
+Options -ExecCGI -Indexes
+RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phps .cgi .pl .py .rb .sh
+RemoveType .php .phtml .php3 .php4 .php5 .php7 .phps
+
+# Allow only specific image/file types
+<FilesMatch "\.(?!jpe?g|jpg|png|gif|webp|pdf|xlsx?|csv|docx?)">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Deny access to PHP files explicitly
+<FilesMatch "\.php[0-9]?$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

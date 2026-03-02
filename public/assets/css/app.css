@@ -1,0 +1,167 @@
+/* ExFer — Application CSS */
+:root {
+    --sidebar-width: 0px;
+    --navbar-height: 56px;
+}
+
+/* Layout */
+.exfer-body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #f5f7fa;
+}
+.exfer-navbar {
+    height: var(--navbar-height);
+    z-index: 1030;
+}
+.exfer-main {
+    padding-top: var(--navbar-height);
+    min-height: calc(100vh - var(--navbar-height) - 50px);
+}
+.exfer-footer {
+    background: white;
+}
+
+/* Tableur (Spreadsheet) */
+.spreadsheet-table td,
+.spreadsheet-table th {
+    padding: .35rem .5rem;
+    font-size: .875rem;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.spreadsheet-table .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: white;
+    border-right: 2px solid #dee2e6 !important;
+}
+.spreadsheet-table thead .sticky-col {
+    background: #212529;
+    z-index: 2;
+}
+
+/* Cellule éditable */
+.editable {
+    cursor: pointer;
+    padding: .15rem .3rem;
+    border-radius: 4px;
+    min-width: 60px;
+    display: inline-block;
+    min-height: 24px;
+}
+.editable:hover {
+    background: #e8f0fe;
+    outline: 1px solid #4285f4;
+}
+.editable.editing {
+    background: white;
+    outline: 2px solid #1a73e8;
+    box-shadow: 0 0 0 3px rgba(26,115,232,.2);
+}
+.editable input,
+.editable select {
+    border: none;
+    outline: none;
+    background: transparent;
+    width: 100%;
+    min-width: 80px;
+    font-size: .875rem;
+    padding: 0;
+}
+
+/* Code Immo */
+.fw-mono {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-weight: 600;
+    font-size: .9rem;
+    letter-spacing: .5px;
+}
+
+/* Badges */
+.badge.fs-6 { font-size: .8rem !important; }
+
+/* Anomalies */
+.anomaly-BLOCKING { border-left: 4px solid #dc3545 !important; }
+.anomaly-ERROR    { border-left: 4px solid #fd7e14 !important; }
+.anomaly-WARNING  { border-left: 4px solid #ffc107 !important; }
+
+/* Cards */
+.card { border-radius: 12px; }
+
+/* Tables */
+.table-hover tbody tr:hover td { background-color: rgba(52, 152, 219, .05); }
+
+/* Autosave indicator */
+#autosave-indicator {
+    transition: opacity .3s;
+}
+
+/* Progress bars */
+.progress { border-radius: 20px; }
+.progress-bar { border-radius: 20px; }
+
+/* Drag & Drop pour réordonner colonnes */
+.drag-handle { cursor: grab; color: #adb5bd; }
+.drag-handle:active { cursor: grabbing; }
+
+/* Photos */
+.photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+}
+.photo-item {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 1;
+    background: #f8f9fa;
+}
+.photo-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.photo-item .photo-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    opacity: 0;
+    transition: opacity .2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+}
+.photo-item:hover .photo-overlay { opacity: 1; }
+
+/* Import wizard steps */
+.import-step { display: none; }
+.import-step.active { display: block; }
+
+/* Responsive table wrapper */
+.table-responsive { border-radius: 0 0 12px 12px; }
+
+/* Vision badge */
+.vision-badge {
+    font-size: .7rem;
+    padding: .15rem .4rem;
+}
+
+/* Highlight nouvelle ligne */
+@keyframes row-highlight {
+    0%   { background: rgba(52, 152, 219, .3); }
+    100% { background: transparent; }
+}
+.row-new {
+    animation: row-highlight 2s ease-out;
+}
+
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 9999;
+}

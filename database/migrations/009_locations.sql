@@ -1,0 +1,26 @@
+-- Migration 009: Locaux (Locations)
+CREATE TABLE IF NOT EXISTS `locations` (
+    `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `organization_id`   INT UNSIGNED NOT NULL,
+    `campaign_id`       INT UNSIGNED NOT NULL,
+    `site_id`           INT UNSIGNED NOT NULL,
+    `code_local`        VARCHAR(100) NOT NULL,
+    `designation_local` VARCHAR(500)          DEFAULT NULL,
+    `status`            ENUM('DRAFT','IN_PROGRESS','VALIDATED','NEEDS_REVIEW') NOT NULL DEFAULT 'DRAFT',
+    `items_count`       INT          NOT NULL DEFAULT 0,
+    `validated_at`      DATETIME              DEFAULT NULL,
+    `validated_by`      INT UNSIGNED          DEFAULT NULL,
+    `created_by`        INT UNSIGNED          DEFAULT NULL,
+    `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_location_code` (`organization_id`, `campaign_id`, `code_local`),
+    KEY `idx_location_campaign` (`campaign_id`),
+    KEY `idx_location_site`     (`site_id`),
+    KEY `idx_location_status`   (`status`),
+    CONSTRAINT `fk_loc_org`       FOREIGN KEY (`organization_id`) REFERENCES `organizations` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_loc_campaign`  FOREIGN KEY (`campaign_id`)     REFERENCES `campaigns` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_loc_site`      FOREIGN KEY (`site_id`)         REFERENCES `sites` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_loc_validator` FOREIGN KEY (`validated_by`)    REFERENCES `users` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_loc_creator`   FOREIGN KEY (`created_by`)      REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
