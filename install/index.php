@@ -3,40 +3,49 @@
  * Wizard d'installation ExFer
  * Accessible uniquement si /storage/installed.lock n'existe pas
  */
-
 // Constantes — protégées contre la double définition (public/index.php les définit déjà)
 if (!defined('ROOT_PATH'))     define('ROOT_PATH',    dirname(__DIR__));
 if (!defined('APP_PATH'))      define('APP_PATH',     ROOT_PATH . '/app');
 if (!defined('STORAGE_PATH'))  define('STORAGE_PATH', ROOT_PATH . '/storage');
 if (!defined('CONFIG_PATH'))   define('CONFIG_PATH',  ROOT_PATH . '/config');
 define('INSTALL_VERSION', '1.0.0');
-
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORTANT (Infomaniak / dossiers) : normaliser /install/ (avec slash final)
+// pour éviter les retours imprévus (301/302) et les routes qui "rebondissent".
+// ─────────────────────────────────────────────────────────────────────────────
+$reqPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+if ($reqPath === '/install') {
+    $qs = $_SERVER['QUERY_STRING'] ?? '';
+    header('Location: /install/' . ($qs ? ('?' . $qs) : ''), true, 302);
+    exit;
+}
+// URLs "propres" pour l'install (tu utilises /install/ sur ton domaine)
+function install_url(string $query = ''): string {
+    return '/install/' . ($query ? ('?' . ltrim($query, '?')) : '');
+}
+function login_url(string $query = ''): string {
+    return '/login' . ($query ? ('?' . ltrim($query, '?')) : '');
+}
 // Démarrage de la mise en tampon de sortie pour éviter les problèmes de headers
 if (!ob_get_level()) ob_start();
-
 // Vérification de l'autoloader
-$autoloader = ROOT_PATH . '/vendor/autoload.php';
+$autoloader  = ROOT_PATH . '/vendor/autoload.php';
 $hasComposer = file_exists($autoloader);
 if ($hasComposer) {
     require_once $autoloader;
 }
-
 // Session — ne démarrer que si pas déjà active
 if (session_status() === PHP_SESSION_NONE) {
     session_start(['cookie_httponly' => true]);
 }
-
 // Par défaut étape 1 (GET) — sera écrasé par POST si nécessaire
 $step    = (int)($_GET['step'] ?? 1);
 $errors  = [];
 $success = [];
-
 // ─── Fonctions utilitaires ─────────────────────────────────────────────────
-
 function install_check_php(): array
 {
     $checks = [];
-
     $checks[] = ['label' => 'PHP version ≥ 7.4',                         'ok' => version_compare(PHP_VERSION, '7.4.0', '>='), 'value' => PHP_VERSION];
     $checks[] = ['label' => 'Extension PDO',                              'ok' => extension_loaded('pdo'),         'value' => ''];
     $checks[] = ['label' => 'Extension PDO MySQL',                        'ok' => extension_loaded('pdo_mysql'),   'value' => ''];
@@ -48,42 +57,33 @@ function install_check_php(): array
     $checks[] = ['label' => 'Dossier /storage/ accessible en écriture',   'ok' => is_writable(STORAGE_PATH),       'value' => STORAGE_PATH];
     $checks[] = ['label' => 'Dossier /config/ accessible en écriture',    'ok' => is_writable(CONFIG_PATH),        'value' => CONFIG_PATH];
     $checks[] = ['label' => 'Composer (autoloader)',                      'ok' => file_exists(ROOT_PATH . '/vendor/autoload.php'), 'value' => ''];
-
     return $checks;
 }
-
 function install_test_db(string $host, string $port, string $dbname, string $user, string $pass): array
 {
     try {
         $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
         $pdo = new PDO($dsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-
         // Vérifier la version MySQL
         $version = $pdo->query('SELECT VERSION()')->fetchColumn();
         preg_match('/^(\d+\.\d+)/', $version, $m);
         $major = (float)($m[1] ?? 0);
-
         if ($major < 5.7) {
             return ['success' => false, 'error' => "MySQL {$version} détecté. Version 5.7+ requise."];
         }
-
         // Vérifier le support JSON
         $pdo->query("SELECT JSON_OBJECT('test', 1)");
-
         return ['success' => true, 'pdo' => $pdo, 'version' => $version];
     } catch (PDOException $e) {
         return ['success' => false, 'error' => 'Connexion échouée : ' . $e->getMessage()];
     }
 }
-
 function install_run_migrations(PDO $pdo): array
 {
     $migDir = ROOT_PATH . '/database/migrations';
     $files  = glob($migDir . '/*.sql');
     sort($files);
-
     $results = [];
-
     // Créer la table migrations_log si elle n'existe pas
     $pdo->exec("CREATE TABLE IF NOT EXISTS `migrations_log` (
         `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -92,10 +92,8 @@ function install_run_migrations(PDO $pdo): array
         PRIMARY KEY (`id`),
         UNIQUE KEY `uk_migration_file` (`migration_file`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
     foreach ($files as $file) {
         $filename = basename($file);
-
         // Vérifier si déjà exécutée
         $stmt = $pdo->prepare('SELECT id FROM migrations_log WHERE migration_file = ?');
         $stmt->execute([$filename]);
@@ -103,7 +101,6 @@ function install_run_migrations(PDO $pdo): array
             $results[] = ['file' => $filename, 'status' => 'skipped'];
             continue;
         }
-
         try {
             $sql = file_get_contents($file);
             // Exécuter chaque statement séparément
@@ -113,17 +110,14 @@ function install_run_migrations(PDO $pdo): array
                     $pdo->exec($stmt_sql);
                 }
             }
-
             $pdo->prepare('INSERT INTO migrations_log (migration_file) VALUES (?)')->execute([$filename]);
             $results[] = ['file' => $filename, 'status' => 'ok'];
         } catch (PDOException $e) {
             $results[] = ['file' => $filename, 'status' => 'error', 'error' => $e->getMessage()];
         }
     }
-
     return $results;
 }
-
 function install_generate_config(array $db, string $appKey): string
 {
     return "<?php\n"
@@ -142,13 +136,10 @@ function install_generate_config(array $db, string $appKey): string
         . "define('VISION_API_URL', null);\n"
         . "define('VISION_API_KEY', null);\n";
 }
-
 // ─── Traitement des étapes (POST) ─────────────────────────────────────────────
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postStep = (int)($_POST['step'] ?? 0);
-    $step = $postStep; // ← Rester sur la bonne étape en cas d'erreur
-
+    $step = $postStep; // rester sur la bonne étape en cas d'erreur
     // ── Étape 2 : Test connexion DB ──
     if ($postStep === 2) {
         $dbConfig = [
@@ -158,113 +149,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'user'   => trim($_POST['db_user']  ?? ''),
             'pass'   => $_POST['db_pass']        ?? '',
         ];
-
         $result = install_test_db(
             $dbConfig['host'], $dbConfig['port'],
             $dbConfig['dbname'], $dbConfig['user'], $dbConfig['pass']
         );
-
         if ($result['success']) {
             $_SESSION['install_db']         = $dbConfig;
             $_SESSION['install_db_version'] = $result['version'];
-            ob_end_clean();
-            header('Location: /install?step=3');
+            if (ob_get_level()) ob_end_clean();
+            header('Location: ' . install_url('step=3'));
             exit;
         } else {
             $errors[] = $result['error'];
         }
     }
-
     // ── Étape 3 : Migrations ──
     elseif ($postStep === 3) {
         if (!isset($_SESSION['install_db'])) {
-            ob_end_clean();
-            header('Location: /install?step=2');
+            if (ob_get_level()) ob_end_clean();
+            header('Location: ' . install_url('step=2'));
             exit;
         }
         $db  = $_SESSION['install_db'];
         $res = install_test_db($db['host'], $db['port'], $db['dbname'], $db['user'], $db['pass']);
         if (!$res['success']) {
-            ob_end_clean();
-            header('Location: /install?step=2');
+            if (ob_get_level()) ob_end_clean();
+            header('Location: ' . install_url('step=2'));
             exit;
         }
-
         $_SESSION['install_migrations'] = install_run_migrations($res['pdo']);
-        ob_end_clean();
-        header('Location: /install?step=4');
+        if (ob_get_level()) ob_end_clean();
+        header('Location: ' . install_url('step=4'));
         exit;
     }
-
     // ── Étape 4 : Compte admin ──
     elseif ($postStep === 4) {
         if (!isset($_SESSION['install_db'])) {
-            ob_end_clean();
-            header('Location: /install?step=2');
+            if (ob_get_level()) ob_end_clean();
+            header('Location: ' . install_url('step=2'));
             exit;
         }
-
         $orgName  = trim($_POST['org_name']       ?? '');
         $name     = trim($_POST['admin_name']     ?? '');
         $email    = strtolower(trim($_POST['admin_email'] ?? ''));
         $password = $_POST['admin_password']       ?? '';
         $confirm  = $_POST['admin_confirm']        ?? '';
-
-        if (!$orgName)                                      $errors[] = 'Le nom de l\'organisation est obligatoire.';
-        if (!$name)                                         $errors[] = 'Le nom de l\'administrateur est obligatoire.';
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL))    $errors[] = 'Adresse email invalide.';
-        if (strlen($password) < 8)                         $errors[] = 'Le mot de passe doit faire au moins 8 caractères.';
-        if ($password !== $confirm)                        $errors[] = 'Les mots de passe ne correspondent pas.';
-
+        if (!$orgName)                                   $errors[] = "Le nom de l'organisation est obligatoire.";
+        if (!$name)                                      $errors[] = "Le nom de l'administrateur est obligatoire.";
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL))  $errors[] = 'Adresse email invalide.';
+        if (strlen($password) < 8)                       $errors[] = 'Le mot de passe doit faire au moins 8 caractères.';
+        if ($password !== $confirm)                      $errors[] = 'Les mots de passe ne correspondent pas.';
         if (empty($errors)) {
             $db  = $_SESSION['install_db'];
             $res = install_test_db($db['host'], $db['port'], $db['dbname'], $db['user'], $db['pass']);
-
             if ($res['success']) {
                 $pdo = $res['pdo'];
-
                 $slugBase = preg_replace('/[^a-z0-9]+/', '_', strtolower($orgName));
                 $slug     = trim($slugBase, '_') ?: 'org';
-
                 $pdo->prepare('INSERT INTO organizations (name, slug, is_active, created_at, updated_at) VALUES (?,?,1,NOW(),NOW())')
                     ->execute([$orgName, $slug]);
                 $orgId = $pdo->lastInsertId();
-
                 $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
                 $pdo->prepare('INSERT INTO users (organization_id, name, email, password_hash, role, is_active, created_at, updated_at) VALUES (?,?,?,?,?,1,NOW(),NOW())')
                     ->execute([$orgId, $name, $email, $hash, 'ADMIN']);
-
                 $_SESSION['install_admin'] = ['org_name' => $orgName, 'email' => $email, 'name' => $name];
-                ob_end_clean();
-                header('Location: /install?step=5');
+                if (ob_get_level()) ob_end_clean();
+                header('Location: ' . install_url('step=5'));
                 exit;
             } else {
                 $errors[] = 'Impossible de reconnecter à la base de données.';
             }
         }
     }
-
     // ── Étape 5 : Finalisation ──
     elseif ($postStep === 5) {
         if (!isset($_SESSION['install_db'])) {
-            ob_end_clean();
-            header('Location: /install?step=2');
+            if (ob_get_level()) ob_end_clean();
+            header('Location: ' . install_url('step=2'));
             exit;
         }
-
         $db     = $_SESSION['install_db'];
         $appKey = bin2hex(random_bytes(32));
-
         file_put_contents(CONFIG_PATH . '/config.php', install_generate_config($db, $appKey));
         file_put_contents(STORAGE_PATH . '/installed.lock', date('Y-m-d H:i:s') . ' — ExFer v' . INSTALL_VERSION);
-
         session_destroy();
-        ob_end_clean();
-        header('Location: /login?installed=1');
+        if (ob_get_level()) ob_end_clean();
+        header('Location: ' . login_url('installed=1'));
         exit;
     }
 }
-
 // ─── Vérifications système ────────────────────────────────────────────────────
 $phpChecks      = install_check_php();
 $hasAllRequired = array_reduce(
@@ -272,7 +245,6 @@ $hasAllRequired = array_reduce(
     fn($carry, $c) => $carry && ($c['ok'] || str_contains($c['value'], '(optionnel)')),
     true
 );
-
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -308,7 +280,6 @@ $hasAllRequired = array_reduce(
             <span class="step-badge">Étape <?= $step ?> / 5</span>
         </div>
     </div>
-
     <div class="install-body">
         <!-- Barre de progression -->
         <div class="progress-steps">
@@ -322,7 +293,6 @@ $hasAllRequired = array_reduce(
             </div>
             <?php endfor; ?>
         </div>
-
         <!-- Messages d'erreur -->
         <?php if ($errors): ?>
         <div class="alert alert-danger">
@@ -333,7 +303,6 @@ $hasAllRequired = array_reduce(
             </ul>
         </div>
         <?php endif; ?>
-
         <!-- ── ÉTAPE 1 : Vérifications système ── -->
         <?php if ($step === 1): ?>
         <h4 class="mb-3"><i class="bi bi-search me-2"></i>Vérifications système</h4>
@@ -350,24 +319,23 @@ $hasAllRequired = array_reduce(
             <?php endforeach; ?>
             </tbody>
         </table>
-
         <?php if (!$hasComposer): ?>
         <div class="alert alert-warning">
             <strong>Composer non installé.</strong> Exécutez <code>composer install</code> depuis la racine du projet avant de continuer.
         </div>
         <?php endif; ?>
-
         <?php if ($hasAllRequired && $hasComposer): ?>
-        <a href="/install?step=2" class="btn btn-primary btn-lg">Continuer <i class="bi bi-arrow-right"></i></a>
+        <a href="<?= htmlspecialchars(install_url('step=2')) ?>" class="btn btn-primary btn-lg">
+            Continuer <i class="bi bi-arrow-right"></i>
+        </a>
         <?php else: ?>
         <button class="btn btn-secondary btn-lg" disabled>Corriger les erreurs d'abord</button>
-        <a href="/install?step=1" class="btn btn-outline-secondary ms-2">Recharger</a>
+        <a href="<?= htmlspecialchars(install_url('step=1')) ?>" class="btn btn-outline-secondary ms-2">Recharger</a>
         <?php endif; ?>
-
         <!-- ── ÉTAPE 2 : Base de données ── -->
         <?php elseif ($step === 2): ?>
         <h4 class="mb-3"><i class="bi bi-database me-2"></i>Configuration de la base de données</h4>
-        <form method="POST" action="/install">
+        <form method="POST" action="<?= htmlspecialchars(install_url()) ?>">
             <input type="hidden" name="step" value="2">
             <div class="row g-3">
                 <div class="col-8">
@@ -410,18 +378,16 @@ $hasAllRequired = array_reduce(
                 </button>
             </div>
         </form>
-
         <!-- ── ÉTAPE 3 : Migrations ── -->
         <?php elseif ($step === 3): ?>
         <h4 class="mb-3"><i class="bi bi-database-gear me-2"></i>Création des tables</h4>
         <p class="text-muted">Cliquez sur le bouton ci-dessous pour créer la structure de la base de données.</p>
-        <form method="POST" action="/install">
+        <form method="POST" action="<?= htmlspecialchars(install_url()) ?>">
             <input type="hidden" name="step" value="3">
             <button type="submit" class="btn btn-primary btn-lg">
                 <i class="bi bi-play-circle me-1"></i>Exécuter les migrations
             </button>
         </form>
-
         <?php if (!empty($_SESSION['install_migrations'])): ?>
         <div class="mt-3">
             <?php foreach ($_SESSION['install_migrations'] as $m): ?>
@@ -435,11 +401,10 @@ $hasAllRequired = array_reduce(
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
-
         <!-- ── ÉTAPE 4 : Compte admin ── -->
         <?php elseif ($step === 4): ?>
         <h4 class="mb-3"><i class="bi bi-person-gear me-2"></i>Création du compte administrateur</h4>
-        <form method="POST" action="/install">
+        <form method="POST" action="<?= htmlspecialchars(install_url()) ?>">
             <input type="hidden" name="step" value="4">
             <div class="mb-3">
                 <label class="form-label">Nom de l'organisation *</label>
@@ -474,7 +439,6 @@ $hasAllRequired = array_reduce(
                 </button>
             </div>
         </form>
-
         <!-- ── ÉTAPE 5 : Finalisation ── -->
         <?php elseif ($step === 5): ?>
         <div class="text-center py-3">
@@ -489,17 +453,15 @@ $hasAllRequired = array_reduce(
                 (<?= htmlspecialchars($_SESSION['install_admin']['email']) ?>)
             </div>
             <?php endif; ?>
-            <form method="POST" action="/install">
+            <form method="POST" action="<?= htmlspecialchars(install_url()) ?>">
                 <input type="hidden" name="step" value="5">
                 <button type="submit" class="btn btn-success btn-lg">
                     <i class="bi bi-rocket-takeoff me-1"></i>Finaliser l'installation
                 </button>
             </form>
         </div>
-
         <?php endif; ?>
     </div>
-
     <div class="text-center mt-3 text-muted small">
         ExFer v<?= INSTALL_VERSION ?> — CMS Inventaire Immobilisations
     </div>
