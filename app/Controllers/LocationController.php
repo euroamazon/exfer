@@ -28,7 +28,7 @@ class LocationController extends Controller
                           (SELECT COUNT(*) FROM inventory_items WHERE location_id = l.id) as items_count,
                           (SELECT COUNT(*) FROM anomalies WHERE location_id = l.id AND status IN ("OPEN","INVESTIGATION")) as anomaly_count
                    FROM locations l
-                   JOIN sites s ON s.id = l.site_id
+                   LEFT JOIN sites s ON s.id = l.site_id
                    WHERE l.campaign_id = ?';
         $params2 = [$campaign['id']];
 
