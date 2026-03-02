@@ -59,7 +59,7 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                         <i class="bi bi-person-circle me-1"></i>
-                        <?= \App\Core\View::e($this->user()['name'] ?? 'Inconnu') ?>
+                        <?= \App\Core\View::e($_user['name'] ?? 'Inconnu') ?>
                         <span class="badge bg-secondary ms-1 small"><?= \App\Core\Auth::role() ?></span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
@@ -83,7 +83,7 @@
 <!-- Contenu principal -->
 <main class="exfer-main">
     <!-- Messages flash -->
-    <?php $flashes = $this->user() ? \App\Core\Session::getFlashes() : ($__data['_flashes'] ?? []); ?>
+    <?php $flashes = $_user ? \App\Core\Session::getFlashes() : ($__data['_flashes'] ?? []); ?>
     <?php if (!empty($_SESSION['_flash'])): ?>
         <?php foreach ($_SESSION['_flash'] as $type => $msg): ?>
             <?php if (!in_array($type, ['_old', 'errors'])): ?>
