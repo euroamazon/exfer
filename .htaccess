@@ -1,0 +1,13 @@
+Options -Indexes
+RewriteEngine On
+
+# Bloquer l'accès direct aux dossiers sensibles
+RewriteRule ^(app|config|database|storage|vendor)(/|$) - [F,L]
+
+# Servir les fichiers statiques depuis public/ s'ils existent (CSS, JS, images…)
+RewriteCond %{REQUEST_URI} ^/(.+)$
+RewriteCond %{DOCUMENT_ROOT}/public/%1 -f
+RewriteRule ^(.+)$ public/$1 [QSA,L]
+
+# Toutes les autres requêtes → front controller
+RewriteRule ^ public/index.php [QSA,L]
