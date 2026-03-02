@@ -90,16 +90,21 @@ class ScopeService
      */
     public static function checkLocationAccess(int $userId, int $locationId, int $orgId): bool
     {
+        // Utilise l.organization_id (cohérent avec requireLocationAccess)
         $location = Database::fetchOne(
-            'SELECT l.*, c.organization_id
+            'SELECT l.id, l.campaign_id, l.site_id
              FROM locations l
-             JOIN campaigns c ON c.id = l.campaign_id
-             WHERE l.id = ? AND c.organization_id = ?',
+             WHERE l.id = ? AND l.organization_id = ?',
             [$locationId, $orgId]
         );
 
         if (!$location) {
             return false;
+        }
+
+        // Fast-path ADMIN via session (déjà validé par requireAuth)
+        if (Auth::isAdmin()) {
+            return true;
         }
 
         $user = Database::fetchOne('SELECT role FROM users WHERE id = ?', [$userId]);
