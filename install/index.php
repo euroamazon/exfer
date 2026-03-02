@@ -139,6 +139,7 @@ function install_generate_config(array $db, string $appKey): string
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postStep = (int)($_POST['step'] ?? 0);
+    $step = $postStep; // Rester sur la bonne étape en cas d'erreur
 
     if ($postStep === 2) {
         // Test connexion DB
