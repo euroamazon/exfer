@@ -17,7 +17,9 @@ if ($hasComposer) {
     require_once $autoloader;
 }
 
-session_start(['cookie_httponly' => true]);
+if (session_status() === PHP_SESSION_NONE) {
+    session_start(['cookie_httponly' => true]);
+}
 
 $step    = (int)($_GET['step'] ?? 1);
 $errors  = [];
