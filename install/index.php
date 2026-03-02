@@ -4,11 +4,15 @@
  * Accessible uniquement si /storage/installed.lock n'existe pas
  */
 
-define('ROOT_PATH', dirname(__DIR__));
-define('APP_PATH',  ROOT_PATH . '/app');
-define('STORAGE_PATH', ROOT_PATH . '/storage');
-define('CONFIG_PATH', ROOT_PATH . '/config');
+// Constantes — protégées contre la double définition (public/index.php les définit déjà)
+if (!defined('ROOT_PATH'))     define('ROOT_PATH',    dirname(__DIR__));
+if (!defined('APP_PATH'))      define('APP_PATH',     ROOT_PATH . '/app');
+if (!defined('STORAGE_PATH'))  define('STORAGE_PATH', ROOT_PATH . '/storage');
+if (!defined('CONFIG_PATH'))   define('CONFIG_PATH',  ROOT_PATH . '/config');
 define('INSTALL_VERSION', '1.0.0');
+
+// Démarrage de la mise en tampon de sortie pour éviter les problèmes de headers
+if (!ob_get_level()) ob_start();
 
 // Vérification de l'autoloader
 $autoloader = ROOT_PATH . '/vendor/autoload.php';
@@ -17,10 +21,12 @@ if ($hasComposer) {
     require_once $autoloader;
 }
 
+// Session — ne démarrer que si pas déjà active
 if (session_status() === PHP_SESSION_NONE) {
     session_start(['cookie_httponly' => true]);
 }
 
+// Par défaut étape 1 (GET) — sera écrasé par POST si nécessaire
 $step    = (int)($_GET['step'] ?? 1);
 $errors  = [];
 $success = [];
@@ -31,17 +37,17 @@ function install_check_php(): array
 {
     $checks = [];
 
-    $checks[] = ['label' => 'PHP version ≥ 7.4', 'ok' => version_compare(PHP_VERSION, '7.4.0', '>='), 'value' => PHP_VERSION];
-    $checks[] = ['label' => 'Extension PDO',         'ok' => extension_loaded('pdo'),         'value' => ''];
-    $checks[] = ['label' => 'Extension PDO MySQL',   'ok' => extension_loaded('pdo_mysql'),   'value' => ''];
-    $checks[] = ['label' => 'Extension JSON',         'ok' => extension_loaded('json'),         'value' => ''];
-    $checks[] = ['label' => 'Extension mbstring',     'ok' => extension_loaded('mbstring'),     'value' => ''];
-    $checks[] = ['label' => 'Extension fileinfo',     'ok' => extension_loaded('fileinfo'),     'value' => ''];
-    $checks[] = ['label' => 'Extension gd',           'ok' => extension_loaded('gd'),           'value' => ''];
-    $checks[] = ['label' => 'Extension zip',          'ok' => extension_loaded('zip'),          'value' => '(optionnel)'];
-    $checks[] = ['label' => 'Dossier /storage/ accessible en écriture', 'ok' => is_writable(STORAGE_PATH), 'value' => STORAGE_PATH];
-    $checks[] = ['label' => 'Dossier /config/ accessible en écriture',  'ok' => is_writable(CONFIG_PATH),  'value' => CONFIG_PATH];
-    $checks[] = ['label' => 'Composer (autoloader)',  'ok' => file_exists(ROOT_PATH . '/vendor/autoload.php'), 'value' => ''];
+    $checks[] = ['label' => 'PHP version ≥ 7.4',                         'ok' => version_compare(PHP_VERSION, '7.4.0', '>='), 'value' => PHP_VERSION];
+    $checks[] = ['label' => 'Extension PDO',                              'ok' => extension_loaded('pdo'),         'value' => ''];
+    $checks[] = ['label' => 'Extension PDO MySQL',                        'ok' => extension_loaded('pdo_mysql'),   'value' => ''];
+    $checks[] = ['label' => 'Extension JSON',                             'ok' => extension_loaded('json'),        'value' => ''];
+    $checks[] = ['label' => 'Extension mbstring',                         'ok' => extension_loaded('mbstring'),    'value' => ''];
+    $checks[] = ['label' => 'Extension fileinfo',                         'ok' => extension_loaded('fileinfo'),    'value' => ''];
+    $checks[] = ['label' => 'Extension gd',                               'ok' => extension_loaded('gd'),          'value' => ''];
+    $checks[] = ['label' => 'Extension zip',                              'ok' => extension_loaded('zip'),         'value' => '(optionnel)'];
+    $checks[] = ['label' => 'Dossier /storage/ accessible en écriture',   'ok' => is_writable(STORAGE_PATH),       'value' => STORAGE_PATH];
+    $checks[] = ['label' => 'Dossier /config/ accessible en écriture',    'ok' => is_writable(CONFIG_PATH),        'value' => CONFIG_PATH];
+    $checks[] = ['label' => 'Composer (autoloader)',                      'ok' => file_exists(ROOT_PATH . '/vendor/autoload.php'), 'value' => ''];
 
     return $checks;
 }
@@ -66,7 +72,7 @@ function install_test_db(string $host, string $port, string $dbname, string $use
 
         return ['success' => true, 'pdo' => $pdo, 'version' => $version];
     } catch (PDOException $e) {
-        return ['success' => false, 'error' => 'Connexion échouée: ' . $e->getMessage()];
+        return ['success' => false, 'error' => 'Connexion échouée : ' . $e->getMessage()];
     }
 }
 
@@ -123,13 +129,13 @@ function install_generate_config(array $db, string $appKey): string
     return "<?php\n"
         . "// Configuration ExFer — générée automatiquement le " . date('Y-m-d H:i:s') . "\n"
         . "// NE PAS MODIFIER MANUELLEMENT\n\n"
-        . "define('DB_HOST', " . var_export($db['host'], true) . ");\n"
-        . "define('DB_PORT', " . var_export($db['port'], true) . ");\n"
+        . "define('DB_HOST', " . var_export($db['host'],   true) . ");\n"
+        . "define('DB_PORT', " . var_export($db['port'],   true) . ");\n"
         . "define('DB_NAME', " . var_export($db['dbname'], true) . ");\n"
-        . "define('DB_USER', " . var_export($db['user'], true) . ");\n"
-        . "define('DB_PASS', " . var_export($db['pass'], true) . ");\n\n"
-        . "define('APP_KEY', " . var_export($appKey, true) . ");\n"
-        . "define('APP_NAME', 'ExFer — Inventaire Immobilisations');\n"
+        . "define('DB_USER', " . var_export($db['user'],   true) . ");\n"
+        . "define('DB_PASS', " . var_export($db['pass'],   true) . ");\n\n"
+        . "define('APP_KEY',     " . var_export($appKey,      true) . ");\n"
+        . "define('APP_NAME',    'ExFer — Inventaire Immobilisations');\n"
         . "define('APP_VERSION', '" . INSTALL_VERSION . "');\n\n"
         . "// Vision IA (optionnel)\n"
         . "define('VISION_MODE_BACKEND', 'stub'); // 'stub' ou 'api'\n"
@@ -137,27 +143,31 @@ function install_generate_config(array $db, string $appKey): string
         . "define('VISION_API_KEY', null);\n";
 }
 
-// ─── Traitement des étapes ────────────────────────────────────────────────────
+// ─── Traitement des étapes (POST) ─────────────────────────────────────────────
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postStep = (int)($_POST['step'] ?? 0);
-    $step = $postStep; // Rester sur la bonne étape en cas d'erreur
+    $step = $postStep; // ← Rester sur la bonne étape en cas d'erreur
 
+    // ── Étape 2 : Test connexion DB ──
     if ($postStep === 2) {
-        // Test connexion DB
         $dbConfig = [
-            'host'   => trim($_POST['db_host']   ?? 'localhost'),
-            'port'   => trim($_POST['db_port']   ?? '3306'),
-            'dbname' => trim($_POST['db_name']   ?? ''),
-            'user'   => trim($_POST['db_user']   ?? ''),
-            'pass'   => $_POST['db_pass']         ?? '',
+            'host'   => trim($_POST['db_host']  ?? 'localhost'),
+            'port'   => trim($_POST['db_port']  ?? '3306'),
+            'dbname' => trim($_POST['db_name']  ?? ''),
+            'user'   => trim($_POST['db_user']  ?? ''),
+            'pass'   => $_POST['db_pass']        ?? '',
         ];
 
-        $result = install_test_db($dbConfig['host'], $dbConfig['port'], $dbConfig['dbname'], $dbConfig['user'], $dbConfig['pass']);
+        $result = install_test_db(
+            $dbConfig['host'], $dbConfig['port'],
+            $dbConfig['dbname'], $dbConfig['user'], $dbConfig['pass']
+        );
 
         if ($result['success']) {
-            $_SESSION['install_db'] = $dbConfig;
+            $_SESSION['install_db']         = $dbConfig;
             $_SESSION['install_db_version'] = $result['version'];
+            ob_end_clean();
             header('Location: /install?step=3');
             exit;
         } else {
@@ -165,42 +175,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ── Étape 3 : Migrations ──
     elseif ($postStep === 3) {
-        // Exécuter les migrations
         if (!isset($_SESSION['install_db'])) {
+            ob_end_clean();
             header('Location: /install?step=2');
             exit;
         }
         $db  = $_SESSION['install_db'];
         $res = install_test_db($db['host'], $db['port'], $db['dbname'], $db['user'], $db['pass']);
         if (!$res['success']) {
+            ob_end_clean();
             header('Location: /install?step=2');
             exit;
         }
 
         $_SESSION['install_migrations'] = install_run_migrations($res['pdo']);
+        ob_end_clean();
         header('Location: /install?step=4');
         exit;
     }
 
+    // ── Étape 4 : Compte admin ──
     elseif ($postStep === 4) {
-        // Créer le compte admin
         if (!isset($_SESSION['install_db'])) {
+            ob_end_clean();
             header('Location: /install?step=2');
             exit;
         }
 
-        $orgName  = trim($_POST['org_name']    ?? '');
-        $name     = trim($_POST['admin_name']  ?? '');
+        $orgName  = trim($_POST['org_name']       ?? '');
+        $name     = trim($_POST['admin_name']     ?? '');
         $email    = strtolower(trim($_POST['admin_email'] ?? ''));
-        $password = $_POST['admin_password']   ?? '';
-        $confirm  = $_POST['admin_confirm']    ?? '';
+        $password = $_POST['admin_password']       ?? '';
+        $confirm  = $_POST['admin_confirm']        ?? '';
 
-        if (!$orgName) $errors[] = 'Le nom de l\'organisation est obligatoire.';
-        if (!$name)    $errors[] = 'Le nom de l\'administrateur est obligatoire.';
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Adresse email invalide.';
-        if (strlen($password) < 8) $errors[] = 'Le mot de passe doit faire au moins 8 caractères.';
-        if ($password !== $confirm) $errors[] = 'Les mots de passe ne correspondent pas.';
+        if (!$orgName)                                      $errors[] = 'Le nom de l\'organisation est obligatoire.';
+        if (!$name)                                         $errors[] = 'Le nom de l\'administrateur est obligatoire.';
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL))    $errors[] = 'Adresse email invalide.';
+        if (strlen($password) < 8)                         $errors[] = 'Le mot de passe doit faire au moins 8 caractères.';
+        if ($password !== $confirm)                        $errors[] = 'Les mots de passe ne correspondent pas.';
 
         if (empty($errors)) {
             $db  = $_SESSION['install_db'];
@@ -209,29 +223,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($res['success']) {
                 $pdo = $res['pdo'];
 
-                // Créer l'organisation
                 $slugBase = preg_replace('/[^a-z0-9]+/', '_', strtolower($orgName));
-                $slug = trim($slugBase, '_') ?: 'org';
+                $slug     = trim($slugBase, '_') ?: 'org';
 
                 $pdo->prepare('INSERT INTO organizations (name, slug, is_active, created_at, updated_at) VALUES (?,?,1,NOW(),NOW())')
                     ->execute([$orgName, $slug]);
                 $orgId = $pdo->lastInsertId();
 
-                // Créer l'admin
                 $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
                 $pdo->prepare('INSERT INTO users (organization_id, name, email, password_hash, role, is_active, created_at, updated_at) VALUES (?,?,?,?,?,1,NOW(),NOW())')
                     ->execute([$orgId, $name, $email, $hash, 'ADMIN']);
 
                 $_SESSION['install_admin'] = ['org_name' => $orgName, 'email' => $email, 'name' => $name];
+                ob_end_clean();
                 header('Location: /install?step=5');
                 exit;
+            } else {
+                $errors[] = 'Impossible de reconnecter à la base de données.';
             }
         }
     }
 
+    // ── Étape 5 : Finalisation ──
     elseif ($postStep === 5) {
-        // Finalisation
         if (!isset($_SESSION['install_db'])) {
+            ob_end_clean();
             header('Location: /install?step=2');
             exit;
         }
@@ -239,24 +255,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db     = $_SESSION['install_db'];
         $appKey = bin2hex(random_bytes(32));
 
-        // Générer config.php
-        $configContent = install_generate_config($db, $appKey);
-        file_put_contents(CONFIG_PATH . '/config.php', $configContent);
-
-        // Créer installed.lock
+        file_put_contents(CONFIG_PATH . '/config.php', install_generate_config($db, $appKey));
         file_put_contents(STORAGE_PATH . '/installed.lock', date('Y-m-d H:i:s') . ' — ExFer v' . INSTALL_VERSION);
 
-        // Nettoyer la session
         session_destroy();
-
+        ob_end_clean();
         header('Location: /login?installed=1');
         exit;
     }
 }
 
-// ─── Vérification de l'étape 1 ───────────────────────────────────────────────
-$phpChecks     = install_check_php();
-$hasAllRequired = array_reduce($phpChecks, fn($carry, $c) => $carry && ($c['ok'] || str_contains($c['value'], '(optionnel)')), true);
+// ─── Vérifications système ────────────────────────────────────────────────────
+$phpChecks      = install_check_php();
+$hasAllRequired = array_reduce(
+    $phpChecks,
+    fn($carry, $c) => $carry && ($c['ok'] || str_contains($c['value'], '(optionnel)')),
+    true
+);
 
 ?>
 <!DOCTYPE html>
@@ -271,10 +286,10 @@ $hasAllRequired = array_reduce($phpChecks, fn($carry, $c) => $carry && ($c['ok']
     body { background: #f0f4f8; }
     .install-wrapper { max-width: 750px; margin: 40px auto; }
     .install-header { background: linear-gradient(135deg, #2c3e50, #3498db); color: white; border-radius: 12px 12px 0 0; padding: 2rem; }
-    .install-body { background: white; border-radius: 0 0 12px 12px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,.1); }
-    .step-badge { background: rgba(255,255,255,.2); border-radius: 20px; padding: .3rem .8rem; font-size:.85rem; }
-    .check-ok   { color: #27ae60; }
-    .check-fail { color: #e74c3c; }
+    .install-body   { background: white; border-radius: 0 0 12px 12px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,.1); }
+    .step-badge     { background: rgba(255,255,255,.2); border-radius: 20px; padding: .3rem .8rem; font-size:.85rem; }
+    .check-ok       { color: #27ae60; }
+    .check-fail     { color: #e74c3c; }
     .progress-steps { display: flex; gap: .5rem; margin-bottom: 2rem; }
     .progress-steps .step { flex:1; padding:.5rem; text-align:center; border-radius:6px; font-size:.8rem; font-weight:600; }
     .progress-steps .step.active  { background:#3498db; color:white; }
@@ -287,7 +302,7 @@ $hasAllRequired = array_reduce($phpChecks, fn($carry, $c) => $carry && ($c['ok']
     <div class="install-header">
         <div class="d-flex justify-content-between align-items-center">
             <div>
-                <h1 class="h3 mb-1">⚙️ Installation ExFer</h1>
+                <h1 class="h3 mb-1">&#9881;&#65039; Installation ExFer</h1>
                 <p class="mb-0 opacity-75">CMS Inventaire Immobilisations v<?= INSTALL_VERSION ?></p>
             </div>
             <span class="step-badge">Étape <?= $step ?> / 5</span>
@@ -303,7 +318,7 @@ $hasAllRequired = array_reduce($phpChecks, fn($carry, $c) => $carry && ($c['ok']
                 $cls = $i < $step ? 'done' : ($i === $step ? 'active' : 'pending');
             ?>
             <div class="step <?= $cls ?>">
-                <?= $i < $step ? '✓ ' : '' ?><?= $stepLabels[$i-1] ?>
+                <?= $i < $step ? '&#10003; ' : '' ?><?= $stepLabels[$i-1] ?>
             </div>
             <?php endfor; ?>
         </div>
@@ -357,27 +372,42 @@ $hasAllRequired = array_reduce($phpChecks, fn($carry, $c) => $carry && ($c['ok']
             <div class="row g-3">
                 <div class="col-8">
                     <label class="form-label">Hôte MySQL *</label>
-                    <input type="text" name="db_host" class="form-control" value="<?= htmlspecialchars($_POST['db_host'] ?? 'localhost') ?>" required>
+                    <input type="text" name="db_host" class="form-control"
+                           value="<?= htmlspecialchars($_POST['db_host'] ?? '') ?>"
+                           placeholder="ex: ya3rm.myd.infomaniak.com" required>
                 </div>
                 <div class="col-4">
                     <label class="form-label">Port</label>
-                    <input type="number" name="db_port" class="form-control" value="<?= htmlspecialchars($_POST['db_port'] ?? '3306') ?>">
+                    <input type="number" name="db_port" class="form-control"
+                           value="<?= htmlspecialchars($_POST['db_port'] ?? '3306') ?>">
                 </div>
                 <div class="col-12">
                     <label class="form-label">Nom de la base de données *</label>
-                    <input type="text" name="db_name" class="form-control" value="<?= htmlspecialchars($_POST['db_name'] ?? '') ?>" placeholder="exfer_db" required>
+                    <input type="text" name="db_name" class="form-control"
+                           value="<?= htmlspecialchars($_POST['db_name'] ?? '') ?>"
+                           placeholder="ex: ya3rm_inventory" required>
                 </div>
                 <div class="col-6">
                     <label class="form-label">Utilisateur MySQL *</label>
-                    <input type="text" name="db_user" class="form-control" value="<?= htmlspecialchars($_POST['db_user'] ?? '') ?>" required>
+                    <input type="text" name="db_user" class="form-control"
+                           value="<?= htmlspecialchars($_POST['db_user'] ?? '') ?>" required>
                 </div>
                 <div class="col-6">
                     <label class="form-label">Mot de passe MySQL</label>
-                    <input type="password" name="db_pass" class="form-control">
+                    <input type="password" name="db_pass" class="form-control"
+                           value="<?= htmlspecialchars($_POST['db_pass'] ?? '') ?>">
                 </div>
             </div>
+            <?php if (!empty($errors)): ?>
+            <div class="alert alert-warning mt-3">
+                <i class="bi bi-info-circle me-1"></i>
+                Vérifiez vos identifiants. Sur Infomaniak, l'hôte MySQL ressemble à <code>xxxxx.myd.infomaniak.com</code>.
+            </div>
+            <?php endif; ?>
             <div class="mt-4">
-                <button type="submit" class="btn btn-primary btn-lg">Tester la connexion <i class="bi bi-arrow-right"></i></button>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    Tester la connexion <i class="bi bi-arrow-right"></i>
+                </button>
             </div>
         </form>
 
@@ -413,16 +443,20 @@ $hasAllRequired = array_reduce($phpChecks, fn($carry, $c) => $carry && ($c['ok']
             <input type="hidden" name="step" value="4">
             <div class="mb-3">
                 <label class="form-label">Nom de l'organisation *</label>
-                <input type="text" name="org_name" class="form-control" value="<?= htmlspecialchars($_POST['org_name'] ?? '') ?>" placeholder="Mon Organisation" required>
+                <input type="text" name="org_name" class="form-control"
+                       value="<?= htmlspecialchars($_POST['org_name'] ?? '') ?>"
+                       placeholder="Mon Organisation" required>
             </div>
             <hr>
             <div class="mb-3">
                 <label class="form-label">Nom de l'administrateur *</label>
-                <input type="text" name="admin_name" class="form-control" value="<?= htmlspecialchars($_POST['admin_name'] ?? '') ?>" required>
+                <input type="text" name="admin_name" class="form-control"
+                       value="<?= htmlspecialchars($_POST['admin_name'] ?? '') ?>" required>
             </div>
             <div class="mb-3">
                 <label class="form-label">Email *</label>
-                <input type="email" name="admin_email" class="form-control" value="<?= htmlspecialchars($_POST['admin_email'] ?? '') ?>" required>
+                <input type="email" name="admin_email" class="form-control"
+                       value="<?= htmlspecialchars($_POST['admin_email'] ?? '') ?>" required>
             </div>
             <div class="row g-3">
                 <div class="col-6">
@@ -435,7 +469,9 @@ $hasAllRequired = array_reduce($phpChecks, fn($carry, $c) => $carry && ($c['ok']
                 </div>
             </div>
             <div class="mt-4">
-                <button type="submit" class="btn btn-primary btn-lg">Créer le compte <i class="bi bi-arrow-right"></i></button>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    Créer le compte <i class="bi bi-arrow-right"></i>
+                </button>
             </div>
         </form>
 
@@ -449,7 +485,8 @@ $hasAllRequired = array_reduce($phpChecks, fn($carry, $c) => $carry && ($c['ok']
             <div class="alert alert-info text-start">
                 <strong>Compte créé :</strong><br>
                 Organisation : <?= htmlspecialchars($_SESSION['install_admin']['org_name']) ?><br>
-                Admin : <?= htmlspecialchars($_SESSION['install_admin']['name']) ?> (<?= htmlspecialchars($_SESSION['install_admin']['email']) ?>)
+                Admin : <?= htmlspecialchars($_SESSION['install_admin']['name']) ?>
+                (<?= htmlspecialchars($_SESSION['install_admin']['email']) ?>)
             </div>
             <?php endif; ?>
             <form method="POST" action="/install">
@@ -459,6 +496,7 @@ $hasAllRequired = array_reduce($phpChecks, fn($carry, $c) => $carry && ($c['ok']
                 </button>
             </form>
         </div>
+
         <?php endif; ?>
     </div>
 
