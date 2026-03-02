@@ -136,10 +136,10 @@ class ScopeService
 
         // Vérifier si le site est autorisé
         foreach ($scopeRows as $scope) {
-            if ($scope['location_id'] === $locationId) {
+            if ($scope['location_id'] !== null && (int)$scope['location_id'] === $locationId) {
                 return true;
             }
-            if ($scope['location_id'] === null && $scope['site_id'] === $location['site_id']) {
+            if ($scope['location_id'] === null && $scope['site_id'] !== null && (int)$scope['site_id'] === (int)$location['site_id']) {
                 return true;
             }
             if ($scope['site_id'] === null && $scope['location_id'] === null) {
@@ -257,7 +257,7 @@ class ScopeService
         $location = Database::fetchOne(
             'SELECT l.*, s.name as site_name, c.name as campaign_name, c.config as campaign_config
              FROM locations l
-             JOIN sites s ON s.id = l.site_id
+             LEFT JOIN sites s ON s.id = l.site_id
              JOIN campaigns c ON c.id = l.campaign_id
              WHERE l.id = ? AND l.organization_id = ?',
             [$locationId, $orgId]

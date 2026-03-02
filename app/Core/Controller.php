@@ -95,6 +95,14 @@ abstract class Controller
     }
 
     /**
+     * Vérifie que l'utilisateur est ADMIN
+     */
+    protected function requireAdmin(): void
+    {
+        Auth::requireAdmin();
+    }
+
+    /**
      * Retourne l'ID de l'organisation courante
      */
     protected function orgId(): ?int
